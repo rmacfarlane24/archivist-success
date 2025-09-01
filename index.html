@@ -252,21 +252,17 @@
         const urlParams = new URLSearchParams(window.location.search);
         const plan = urlParams.get('plan');
         const sessionId = urlParams.get('session_id');
-        const email = urlParams.get('email');
 
         // Debug: Log all URL parameters
         console.log('All URL parameters:', Object.fromEntries(urlParams.entries()));
         console.log('Plan:', plan);
         console.log('Session ID:', sessionId);
-        console.log('Email:', email);
 
         // Update UI with plan details
         function updateUI() {
             const planBadge = document.getElementById('planBadge');
             const planDetail = document.getElementById('planDetail');
             const sessionDetail = document.getElementById('sessionDetail');
-            const emailDetail = document.getElementById('emailDetail');
-            const message = document.getElementById('message');
 
             if (plan) {
                 planBadge.textContent = plan;
@@ -284,10 +280,6 @@
             if (sessionId) {
                 sessionDetail.textContent = sessionId.substring(0, 20) + '...';
             }
-
-            if (email) {
-                emailDetail.textContent = email;
-            }
         }
 
         // Call the Edge Function to update subscription
@@ -297,11 +289,11 @@
             const details = document.getElementById('details');
 
             try {
-                if (!plan || !sessionId || !email) {
-                    throw new Error('Missing required parameters');
+                if (!plan || !sessionId) {
+                    throw new Error('Missing required parameters: plan and session_id');
                 }
 
-                console.log('Calling Edge Function with:', { plan, email, session_id: sessionId });
+                console.log('Calling Edge Function with:', { plan, session_id: sessionId });
 
                 // Call the Supabase Edge Function with authentication
                 const response = await fetch(EDGE_FUNCTION_URL, {
@@ -312,7 +304,6 @@
                     },
                     body: JSON.stringify({
                         plan: plan,
-                        email: email,
                         session_id: sessionId
                     })
                 });
@@ -333,13 +324,19 @@
                     details.style.display = 'block';
                     closeButton.disabled = false;
 
+                    // Update the email detail with the email from the response
+                    const emailDetail = document.getElementById('emailDetail');
+                    if (result.email) {
+                        emailDetail.textContent = result.email;
+                    }
+
                     // Notify the parent window (if in WebView)
                     if (window.parent && window.parent !== window) {
                         window.parent.postMessage({
                             type: 'PAYMENT_SUCCESS',
                             plan: plan,
                             sessionId: sessionId,
-                            email: email
+                            email: result.email
                         }, '*');
                     }
 
