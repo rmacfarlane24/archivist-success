@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Payment Successful - Archivist</title>
-    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <style>
         * {
             margin: 0;
@@ -243,12 +242,8 @@
     </div>
 
     <script>
-        // Supabase configuration
-        const SUPABASE_URL = 'YOUR_SUPABASE_URL';
-        const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY';
-        
-        // Initialize Supabase client
-        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        // Supabase Edge Function URL
+        const EDGE_FUNCTION_URL = 'https://xslphflkpeyfqcwwlrih.supabase.co/functions/v1/update-subscription';
 
         // Get URL parameters
         const urlParams = new URLSearchParams(window.location.search);
@@ -286,7 +281,7 @@
             }
         }
 
-        // Update Supabase with subscription details
+        // Call the Edge Function to update subscription
         async function updateSubscription() {
             const status = document.getElementById('status');
             const closeButton = document.getElementById('closeButton');
@@ -297,48 +292,52 @@
                     throw new Error('Missing required parameters');
                 }
 
-                // Update the user's profile in Supabase
-                const { error } = await supabase
-                    .from('profiles')
-                    .upsert({
-                        email: email,
+                // Call the Supabase Edge Function
+                const response = await fetch(EDGE_FUNCTION_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
                         plan: plan,
-                        access_granted: true,
-                        last_payment_date: new Date().toISOString(),
-                        stripe_customer_id: sessionId,
-                        // Set subscription end date based on plan
-                        subscription_ends_at: plan === 'lifetime' ? null : 
-                            new Date(Date.now() + (plan === 'monthly' ? 30 : 365) * 24 * 60 * 60 * 1000).toISOString(),
-                        // Clear trial end date since they now have paid access
-                        trial_ends_at: null
-                    }, {
-                        onConflict: 'email'
-                    });
+                        email: email,
+                        session_id: sessionId
+                    })
+                });
 
-                if (error) {
-                    throw error;
+                const result = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(result.error || 'Failed to update subscription');
                 }
 
-                // Success
-                status.className = 'status success';
-                status.textContent = 'Subscription updated successfully!';
-                details.style.display = 'block';
-                closeButton.disabled = false;
+                if (result.success) {
+                    // Success
+                    status.className = 'status success';
+                    status.textContent = 'Subscription updated successfully!';
+                    details.style.display = 'block';
+                    closeButton.disabled = false;
 
-                // Notify the parent window (if in WebView)
-                if (window.parent && window.parent !== window) {
-                    window.parent.postMessage({
-                        type: 'PAYMENT_SUCCESS',
-                        plan: plan,
-                        sessionId: sessionId,
-                        email: email
-                    }, '*');
+                    // Notify the parent window (if in WebView)
+                    if (window.parent && window.parent !== window) {
+                        window.parent.postMessage({
+                            type: 'PAYMENT_SUCCESS',
+                            plan: plan,
+                            sessionId: sessionId,
+                            email: email
+                        }, '*');
+                    }
+
+                    console.log('Subscription updated successfully:', result);
+
+                } else {
+                    throw new Error(result.error || 'Unknown error occurred');
                 }
 
             } catch (error) {
                 console.error('Error updating subscription:', error);
                 status.className = 'status error';
-                status.textContent = 'Error updating subscription. Please contact support.';
+                status.textContent = `Error updating subscription: ${error.message}`;
                 closeButton.disabled = false;
             }
         }
