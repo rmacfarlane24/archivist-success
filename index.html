@@ -244,12 +244,21 @@
     <script>
         // Supabase Edge Function URL
         const EDGE_FUNCTION_URL = 'https://xslphflkpeyfqcwwlrih.supabase.co/functions/v1/update-subscription';
+        
+        // Supabase Anonymous Key
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhzbHBoZmxrcGV5ZnFjd3dscmloIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTMyNzkwNTgsImV4cCI6MjA2ODg1NTA1OH0.WICKm7rDZ899epi_0Nz7N435V2WEQI5sNxSzCoJ40EQ';
 
         // Get URL parameters
         const urlParams = new URLSearchParams(window.location.search);
         const plan = urlParams.get('plan');
         const sessionId = urlParams.get('session_id');
         const email = urlParams.get('email');
+
+        // Debug: Log all URL parameters
+        console.log('All URL parameters:', Object.fromEntries(urlParams.entries()));
+        console.log('Plan:', plan);
+        console.log('Session ID:', sessionId);
+        console.log('Email:', email);
 
         // Update UI with plan details
         function updateUI() {
@@ -292,11 +301,14 @@
                     throw new Error('Missing required parameters');
                 }
 
-                // Call the Supabase Edge Function
+                console.log('Calling Edge Function with:', { plan, email, session_id: sessionId });
+
+                // Call the Supabase Edge Function with authentication
                 const response = await fetch(EDGE_FUNCTION_URL, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
                     },
                     body: JSON.stringify({
                         plan: plan,
@@ -305,10 +317,13 @@
                     })
                 });
 
+                console.log('Edge Function response status:', response.status);
+
                 const result = await response.json();
+                console.log('Edge Function response:', result);
 
                 if (!response.ok) {
-                    throw new Error(result.error || 'Failed to update subscription');
+                    throw new Error(result.error || `HTTP ${response.status}: ${response.statusText}`);
                 }
 
                 if (result.success) {
